@@ -114,6 +114,35 @@ class TestSignupForActivity:
         )
         assert response.status_code == 200
 
+    def test_signup_at_full_capacity(self, client):
+        """Test that signup fails when activity is at full capacity"""
+        # Chess Club has max_participants=12 and currently has 2 participants
+        # Add 10 more students to reach capacity
+        for i in range(10):
+            response = client.post(
+                f"/activities/Chess Club/signup?email=student{i}@mergington.edu"
+            )
+            assert response.status_code == 200
+        
+        # Verify we're at capacity
+        activities_response = client.get("/activities")
+        activities_data = activities_response.json()
+        assert len(activities_data["Chess Club"]["participants"]) == 12
+        
+        # Try to add one more student - should fail
+        response = client.post(
+            "/activities/Chess Club/signup?email=overflow@mergington.edu"
+        )
+        assert response.status_code == 400
+        data = response.json()
+        assert "full capacity" in data["detail"].lower()
+        
+        # Verify the student was not added
+        activities_response = client.get("/activities")
+        activities_data = activities_response.json()
+        assert "overflow@mergington.edu" not in activities_data["Chess Club"]["participants"]
+        assert len(activities_data["Chess Club"]["participants"]) == 12
+
 
 class TestUnregisterFromActivity:
     """Tests for DELETE /activities/{activity_name}/unregister endpoint"""
